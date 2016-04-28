@@ -9,7 +9,7 @@ import redis
 import random
 import ast
 
-r = redis.StrictRedis(host='localhost', port=6379, db=0)
+r = redis.from_url(os.environ.get("REDIS_URL"))
 
 '''
 This is a simple Websocket Echo server that uses the Tornado websocket handler.
