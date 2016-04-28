@@ -1,5 +1,6 @@
 import tornado.httpserver
-from tornado.options import options, parse_command_line
+from tornado.options import (options,
+    parse_command_line, define)
 from tornado.websocket import WebSocketHandler
 import tornado.ioloop
 import tornado.web
@@ -10,6 +11,8 @@ import redis
 import random
 import ast
 
+
+define("port", default=8888, help="run on the given port", type=int)
 r = redis.from_url(os.environ.get("REDIS_URL"))
 
 '''
