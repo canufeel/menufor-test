@@ -21,9 +21,9 @@ Messages are output to the terminal for debuggin purposes.
 
 class Game(object):
 
-    rows = 3
-    columns = 3
-    win_count = 3
+    rows = 15
+    columns = 15
+    win_count = 5
 
     def __init__(self,owner,opponent):
         self.owner = owner
@@ -417,6 +417,21 @@ class WSHandler(WebSocketHandler):
         second_user = self.game.opponent
         self.game_initialize(second_user)
 
+    def end_game(self,blank):
+        opponent = self.game.opponent
+        own_instance = self.game.owner
+        opponent['state'] = 'empty'
+        opponent.get('connection').game = None
+        own_instance['state'] = 'empty'
+        own_instance.get('connection').game = None
+        opponent.get('connection').write_message({
+            "type":"end_game"
+            })
+        self.write_message({
+            "type":"end_game"
+            })
+
+
     def on_message(self, message):
         print(message)
         json_dict = json.loads(message)
@@ -432,6 +447,9 @@ class WSHandler(WebSocketHandler):
  
     def check_origin(self, origin):
         return True
+
+    def _on_close_called(self):
+        print('on closed')
 
 application = tornado.web.Application([
     (r'/', WSHandler),
