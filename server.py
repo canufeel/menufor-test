@@ -1,4 +1,5 @@
 import tornado.httpserver
+from tornado.options import options, parse_command_line
 from tornado.websocket import WebSocketHandler
 import tornado.ioloop
 import tornado.web
@@ -456,8 +457,8 @@ application = tornado.web.Application([
 ])
 
 if __name__ == "__main__":
-    tornado.options.parse_command_line()
+    parse_command_line()
     http_server = tornado.httpserver.HTTPServer(application)
-    http_server.listen(tornado.options.options.port)
+    http_server.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()
  
