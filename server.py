@@ -11,9 +11,17 @@ import redis
 import random
 import ast
 
+try:
+    LOCAL = os.environ.get('LOCAL')
+except:
+    LOCAL = False
 
 define("port", default=8888, help="run on the given port", type=int)
-r = redis.from_url(os.environ.get("REDIS_URL"))
+
+if not LOCAL:
+    r = redis.from_url(os.environ.get("REDIS_URL"))
+else:
+    r = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 '''
 This is a simple Websocket Echo server that uses the Tornado websocket handler.
@@ -247,20 +255,57 @@ class Game(object):
         else:
             return False
 
+class DataAdapter(object):
+
+    @classmethod
+    def get_leaderboard(cls):
+        final_arr = []
+        byte_dict = r.hgetall('leaderboard')
+        for key, value in byte_dict.items():
+            data = {
+                "username":key.decode('utf-8')
+                }
+            data.update(ast.literal_eval(value.decode('utf-8')))
+            final_arr.append(data)
+        return final_arr
+
+    @classmethod
+    def increment_wins(cls,instance):
+        value = r.hget('leaderboard', instance.get('username'))
+        data = ast.literal_eval(value.decode('utf-8'))
+        data['wins'] += 1
+        r.hset('leaderboard', instance.get('username'),data)
+
+    @classmethod
+    def increment_moves(cls,instance):
+        value = r.hget('leaderboard', instance.get('username'))
+        data = ast.literal_eval(value.decode('utf-8'))
+        data['moves'] += 1
+        r.hset('leaderboard', instance.get('username'),data)
+
+    @classmethod
+    def check_create_user_for_leaderboards(cls,instance):
+        if not r.hexists('leaderboard', instance.get('username')):
+            data = {
+                "wins":0,
+                "moves":0
+            }
+            r.hset('leaderboard',instance.get('username'),data)
+
 class WSHandler(WebSocketHandler):
 
+
+    _on_close_called = False
     _registry = []
+    adapter = DataAdapter
 
     def __init__(self,*args,**kwargs):
-        print('in init')
         self._registry.append({"connection":self})
         super(WebSocketHandler,self).__init__(*args,**kwargs)
 
-
     def open(self):
-        print('socketopen')
-        leaderboard = self.get_leaderboard()
-        print(leaderboard)
+        self.connection_closed = False
+        leaderboard = self.adapter.get_leaderboard()
         self.write_message(\
             {
                 'type':'leaderboard',
@@ -283,43 +328,12 @@ class WSHandler(WebSocketHandler):
                 return registry_instance
         return False
 
-    def get_leaderboard(self):
-        final_arr = []
-        byte_dict = r.hgetall('leaderboard')
-        for key, value in byte_dict.items():
-            data = {
-                "username":key.decode('utf-8')
-                }
-            data.update(ast.literal_eval(value.decode('utf-8')))
-            final_arr.append(data)
-        return final_arr
-
-    def increment_wins(self,instance):
-        value = r.hget('leaderboard', instance.get('username'))
-        data = ast.literal_eval(value.decode('utf-8'))
-        data['wins'] += 1
-        r.hset('leaderboard', instance.get('username'),data)
-
-    def increment_moves(self,instance):
-        value = r.hget('leaderboard', instance.get('username'))
-        data = ast.literal_eval(value.decode('utf-8'))
-        data['moves'] += 1
-        r.hset('leaderboard', instance.get('username'),data)
-
-    def check_create_user_for_leaderboards(self,instance):
-        if not r.hexists('leaderboard', instance.get('username')):
-            data = {
-                "wins":0,
-                "moves":0
-            }
-            r.hset('leaderboard',instance.get('username'),data)
-
     def game_initialize(self,second_user_instance):
         own_instance = self.registry_instance_for_self
         own_instance['state'] = 'playing'
         second_user_instance['state'] = 'playing'
-        self.check_create_user_for_leaderboards(own_instance)
-        self.check_create_user_for_leaderboards(second_user_instance)
+        self.adapter.check_create_user_for_leaderboards(own_instance)
+        self.adapter.check_create_user_for_leaderboards(second_user_instance)
 
         tie = int(random.random()*100)
         if tie < 49:
@@ -337,7 +351,7 @@ class WSHandler(WebSocketHandler):
         own_instance['mark'] = mark_first
         second_user_instance['mark'] = mark_second
         own_connection = own_instance.get('connection')
-        leaderboard = self.get_leaderboard()
+        leaderboard = self.adapter.get_leaderboard()
         own_connection.write_message(
             {
                 "type":"game_start",
@@ -379,7 +393,7 @@ class WSHandler(WebSocketHandler):
         self.increment_moves(own_instance)
         win = game.check_win_condition(data)
         if not win:
-            leaderboard = self.get_leaderboard()
+            leaderboard = self.adapter.get_leaderboard()
             print('next move')
             opponent_instance['move'] = True
             own_instance['move'] = False
@@ -400,7 +414,7 @@ class WSHandler(WebSocketHandler):
                 })
         else:
             self.increment_wins(own_instance)
-            leaderboard = self.get_leaderboard()
+            leaderboard = self.adapter.get_leaderboard()
             opponent_instance.get('connection').write_message({
                     "type":"game_over",
                     "content": {
@@ -422,46 +436,78 @@ class WSHandler(WebSocketHandler):
         self.game_initialize(second_user)
 
     def end_game(self,blank):
-        opponent = self.game.opponent
-        own_instance = self.game.owner
-        opponent['state'] = 'empty'
-        opponent.get('connection').game = None
-        own_instance['state'] = 'empty'
-        own_instance.get('connection').game = None
-        opponent.get('connection').write_message({
-            "type":"end_game"
-            })
-        self.write_message({
-            "type":"end_game"
-            })
+        self.cleanup()
 
+    def write_message_with_precheck(self,data):
+        if not self.connection_closed:
+            self.write_message(data)
+
+    def switch_user(self,data):
+        new_username = data.get('new_username')
+        own_instance = self.registry_instance_for_self
+        own_instance['username'] = new_username
+        if hasattr(self,'game') and not isinstance(self.game,type(None)):
+            opponent = self.game.opponent
+            opponent.get('connection').write_message_with_precheck({
+                "type":"end_game"
+            })
+            self.write_message_with_precheck({
+                "type":"end_game"
+            })
+        else:
+            own_instance['state'] = 'empty'
+            second_player_instance = self.find_registry_instance_with_empty_game_state()
+            if isinstance(second_player_instance,dict):
+                self.game_initialize(second_player_instance)
+
+    def cleanup(self):
+        try:
+            if hasattr(self,'game') and not isinstance(self.game,type(None)):
+                opponent = self.game.opponent
+                own_instance = self.game.owner
+                opponent['state'] = 'empty'
+                opponent.get('connection').game = None
+                own_instance['state'] = 'empty'
+                own_instance.get('connection').game = None
+                opponent.get('connection').write_message_with_precheck({
+                    "type":"end_game"
+                    })
+                self.write_message_with_precheck({
+                    "type":"end_game"
+                    })
+        except Exception as exc:
+            raise exc
 
     def on_message(self, message):
         print(message)
+        self.connection_closed = False
+        if isinstance(message,bytes):
+            message = message.decode('utf-8')
         json_dict = json.loads(message)
         if hasattr(self,json_dict.get('type')):
             method = getattr(self,json_dict.get('type'))
             method(json_dict.get('content'))
 
     def on_close(self):
-        instance = self.get_registry_instance_for_self()
+        self.connection_closed = True
+        self.cleanup()
+        instance = self.registry_instance_for_self
         index = self._registry.index(instance)
-        self._registy.pop(index)
-        print('connection closed')
+        self._registry.pop(index)
  
     def check_origin(self, origin):
         return True
 
-    def _on_close_called(self):
-        print('on closed')
-
-application = tornado.web.Application([
-    (r'/', WSHandler),
-])
+def make_app():
+    application = tornado.web.Application([
+        (r'/', WSHandler),
+    ])
+    return application
 
 if __name__ == "__main__":
     parse_command_line()
-    http_server = tornado.httpserver.HTTPServer(application)
+    http_server = tornado.httpserver.HTTPServer(make_app())
     http_server.listen(options.port)
+    print('running...')
     tornado.ioloop.IOLoop.instance().start()
  
