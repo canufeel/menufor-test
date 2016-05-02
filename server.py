@@ -390,7 +390,7 @@ class WSHandler(WebSocketHandler):
         own_instance = self.game.owner
         opponent_instance = self.game.opponent
         game.update_game_field_internal_owner(data)
-        self.adater.increment_moves(own_instance)
+        self.adapter.increment_moves(own_instance)
         win = game.check_win_condition(data)
         if not win:
             leaderboard = self.adapter.get_leaderboard()
