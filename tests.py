@@ -226,4 +226,51 @@ class TestHelloApp(AsyncHTTPTestCase):
 		yield gen.sleep(2)
 		self.assertEqual(self.handler._registry,[])
 
-
+	@gen_test(timeout=40)
+	def test_horizontal_win_condition(self):
+		self.assertEqual(self.handler._registry,[])
+		c = yield self._mk_client()
+		c1 = yield self._mk_client()
+		data = {"type":"new_user","content":"user1"}
+		data2 = {"type":"new_user","content":"user2"}
+		_ = yield c.write_message(json.dumps(data))
+		yield gen.sleep(2)
+		_ = yield c1.write_message(json.dumps(data2))
+		yield gen.sleep(2)
+		response = yield c.read_message()
+		response2 = yield c1.read_message()
+		result1 = json.loads(response)
+		self.assertEqual(result1['type'],'game_start')
+		result2 = json.loads(response2)
+		self.assertEqual(result2['type'],'game_start')
+		self.assertTrue(result1['content']['move'] or result2['content']['move'])
+		if result1['content']['move']:
+			cells = [{"state":result1['content']['mark'] , "x": x, "y": 0} for x in range(0,5)]
+			for index, cell in enumerate(cells):
+				data3 = {"type": "user_move", "content": cell}
+				_ = yield c.write_message(json.dumps(data3))
+				yield gen.sleep(2)
+				response2 = yield c1.read_message()
+				resp_data = json.loads(response2)
+				if len(cells)-1 != index:
+					self.assertTrue(resp_data['content']['move'])
+					self.assertEqual(resp_data['content']['cell'],cell)
+				else:
+					self.assertEqual(resp_data['type'],'game_over')
+		elif result2['content']['move']:
+			cells = [{"state":result2['content']['mark'] , "x": x, "y": 0} for x in range(0,5)]
+			for index, cell in enumerate(cells):
+				data3 = {"type": "user_move", "content": cell}
+				_ = yield c1.write_message(json.dumps(data3))
+				yield gen.sleep(2)
+				response = yield c.read_message()
+				resp_data = json.loads(response)
+				if len(cells)-1 != index:
+					self.assertTrue(resp_data['content']['move'])
+					self.assertEqual(resp_data['content']['cell'],cell)
+				else:
+					self.assertEqual(resp_data['type'],'game_over')
+		c.close(code=1000)
+		c1.close(code=1000)
+		yield gen.sleep(2)
+		self.assertEqual(self.handler._registry,[])

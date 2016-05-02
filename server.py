@@ -77,21 +77,25 @@ class Game(object):
             cell['state'] = self.opponent['mark']
 
     def check_horizontal_axis(self,y,orig_x,x=None,count=1,reverse=False):
+        print('checking horizontal y: {0!s}, x:{1!s}, original_x:{2!s}, count: {3!s}, reverse: {4!s}'.format(y,x,orig_x,count,reverse))
         row = self._game_field[y]
         if not reverse:
         
             if isinstance(x,type(None)):
                 x = orig_x + 1
                 if x >= len(row):
+                    print('short row')
                     reverse=True
                     return self.check_horizontal_axis(y,orig_x,
                         x=None,reverse=reverse,count=count)
                 else:
                     if row[x]['state'] == self.owner['mark']:
+                        print('incrementing count')
                         count+=1
                         return self.check_horizontal_axis(y,orig_x,
                             x=x,reverse=reverse,count=count)
                     else:
+                        print('wrong state')
                         reverse = True
                         return self.check_horizontal_axis(y,orig_x,
                             x=None,reverse=reverse,count=count)
@@ -99,18 +103,20 @@ class Game(object):
 
             if isinstance(x,type(None)):
                 x = orig_x - 1
-                if x < 0:
-                    return count >= self.win_count
+            else:
+                x-=1
+            if x < 0:
+                return count >= self.win_count
+            else:
+                if row[x]['state'] == self.owner['mark']:
+                    count+=1
+                    return self.check_horizontal_axis(y,orig_x,
+                        x=x,reverse=reverse,count=count)
                 else:
-                    if row[x]['state'] == self.owner['mark']:
-                        count+=1
-                        return self.check_horizontal_axis(y,orig_x,
-                            x=x,reverse=reverse,count=count)
-                    else:
-                        return count >= self.win_count
-
+                    return count >= self.win_count
 
     def check_vertical_axis(self,x,orig_y,y=None,count=1,reverse=False):
+        print('checking vertical y: {0!s}, x:{1!s}, original_x:{2!s}, count: {3!s}, reverse: {4!s}'.format(y,x,orig_y,count,reverse))
         if not reverse:
         
             if isinstance(x,type(None)):
@@ -132,31 +138,17 @@ class Game(object):
 
             if isinstance(y,type(None)):
                 y = orig_y - 1
-                if y < 0:
-                    return count >= self.win_count
+            else:
+                y-=1
+            if y < 0:
+                return count >= self.win_count
+            else:
+                if self._game_field[y][x]['state'] == self.owner['mark']:
+                    count+=1
+                    return self.check_horizontal_axis(x,orig_y,
+                        y=y,reverse=reverse,count=count)
                 else:
-                    if self._game_field[y][x]['state'] == self.owner['mark']:
-                        count+=1
-                        return self.check_horizontal_axis(x,orig_y,
-                            y=y,reverse=reverse,count=count)
-                    else:
-                        return count >= self.win_count
-
-
-    '''depr
-
-    def check_vertical_axis(self,x):
-        count = 0
-        print('checking vertical with x: {0!s}'.format(x))
-        for row in self._game_field:
-            if row[x]['state'] == self.owner['mark']:
-                count+=1
-        if count >= self.win_count:
-            print('vertical win')
-            return True
-        else:
-            return False
-    '''
+                    return count >= self.win_count
 
     def check_second_diagonal(self,orig_x,orig_y,count=1,reverse=False,x=None,y=None):
         if not reverse:
@@ -204,7 +196,6 @@ class Game(object):
             else:
                 x+=1
                 y+=1
-            print('x: {0!s}, y: {1!s}'.format(x,y))
             if x >= self.columns or y >= self.rows:
                 reverse = True
                 return self.check_first_diagonal(orig_x,orig_y,count=count,
@@ -247,9 +238,11 @@ class Game(object):
     def check_win_condition(self,data):
         x = data.get('x')
         y = data.get('y')
+        
         win_array = [self.check_horizontal_axis(y,x),
             self.check_vertical_axis(x,y),
             self.check_diagonal(x,y)]
+        print(win_array)
         if any(win_array):
             return True
         else:
