@@ -36,6 +36,7 @@ class Game(object):
     rows = 15
     columns = 15
     win_count = 5
+    win_cells = []
 
     def __init__(self,owner,opponent):
         self.owner = owner
@@ -63,7 +64,6 @@ class Game(object):
         cell = self._game_field[y][x]
         if not cell['state']:
             cell['state'] = self.owner['mark']
-        print(self._game_field)
         opponent_game = self.opponent['connection'].game
         opponent_game.update_game_field_internal_opponent(data)
 
@@ -77,7 +77,6 @@ class Game(object):
             cell['state'] = self.opponent['mark']
 
     def check_horizontal_axis(self,y,orig_x,x=None,count=1,reverse=False):
-        print('checking horizontal y: {0!s}, x:{1!s}, original_x:{2!s}, count: {3!s}, reverse: {4!s}'.format(y,x,orig_x,count,reverse))
         row = self._game_field[y]
         if not reverse:
         
@@ -92,6 +91,7 @@ class Game(object):
             else:
                 if row[x]['state'] == self.owner['mark']:
                     count+=1
+                    self.win_cells.append(row[x])
                     return self.check_horizontal_axis(y,orig_x,
                         x=x,reverse=reverse,count=count)
                 else:
@@ -105,17 +105,23 @@ class Game(object):
             else:
                 x-=1
             if x < 0:
-                return count >= self.win_count
+                if count >= self.win_count:
+                    return self.win_cells
+                else:
+                    return False
             else:
                 if row[x]['state'] == self.owner['mark']:
                     count+=1
+                    self.win_cells.append(row[x])
                     return self.check_horizontal_axis(y,orig_x,
                         x=x,reverse=reverse,count=count)
                 else:
-                    return count >= self.win_count
+                    if count >= self.win_count:
+                        return self.win_cells
+                    else:
+                        return False
 
     def check_vertical_axis(self,x,orig_y,y=None,count=1,reverse=False):
-        print('checking vertical y: {0!s}, x:{1!s}, original_y:{2!s}, count: {3!s}, reverse: {4!s}'.format(y,x,orig_y,count,reverse))
         if not reverse:
         
             if isinstance(y,type(None)):
@@ -129,6 +135,7 @@ class Game(object):
             else:
                 if self._game_field[y][x]['state'] == self.owner['mark']:
                     count+=1
+                    self.win_cells.append(self._game_field[y][x])
                     return self.check_vertical_axis(x,orig_y,
                         y=y,reverse=reverse,count=count)
                 else:
@@ -142,14 +149,21 @@ class Game(object):
             else:
                 y-=1
             if y < 0:
-                return count >= self.win_count
+                if count >= self.win_count:
+                    return self.win_cells
+                else:
+                    return False
             else:
                 if self._game_field[y][x]['state'] == self.owner['mark']:
                     count+=1
+                    self.win_cells.append(self._game_field[y][x])
                     return self.check_vertical_axis(x,orig_y,
                         y=y,reverse=reverse,count=count)
                 else:
-                    return count >= self.win_count
+                    if count >= self.win_count:
+                        return self.win_cells
+                    else:
+                        return False
 
     def check_second_diagonal(self,orig_x,orig_y,count=1,reverse=False,x=None,y=None):
         if not reverse:
@@ -165,6 +179,7 @@ class Game(object):
                     count=count,reverse=reverse,x=None,y=None)
             else:
                 if self._game_field[y][x]['state'] == self.owner['mark']:
+                    self.win_cells.append(self._game_field[y][x])
                     count+=1
                     return self.check_second_diagonal(orig_x,orig_y,
                         count=count,reverse=reverse,x=x,y=y)
@@ -180,14 +195,21 @@ class Game(object):
                 x-=1
                 y+=1
             if x < 0 or y == self.rows:
-                return count >= self.win_count
+                if count >= self.win_count:
+                    return self.win_cells
+                else:
+                    return False
             else:
                 if self._game_field[y][x]['state'] == self.owner['mark']:
                     count+=1
+                    self.win_cells.append(self._game_field[y][x])
                     return self.check_second_diagonal(orig_x,orig_y,
                         count=count,reverse=reverse,x=x,y=y)
                 else:
-                    return count >= self.win_count
+                    if count >= self.win_count:
+                        return self.win_cells
+                    else:
+                        return False
 
     def check_first_diagonal(self,orig_x,orig_y,count=1,reverse=False,x=None,y=None):
         if not reverse:
@@ -204,6 +226,7 @@ class Game(object):
             else:
                 if self._game_field[y][x]['state'] == self.owner['mark']:
                     count+=1
+                    self.win_cells.append(self._game_field[y][x])
                     return self.check_first_diagonal(orig_x,orig_y,
                         count=count,reverse=reverse,x=x,y=y)
                 else:
@@ -218,36 +241,56 @@ class Game(object):
                 x-=1
                 y-=1
             if x < 0 or y < 0:
-                return count >= self.win_count
+                if count >= self.win_count:
+                    return self.win_cells
+                else:
+                    return False
             else:
                 if self._game_field[y][x]['state'] == self.owner['mark']:
                     count+=1
+                    self.win_cells.append(self._game_field[y][x])
                     return self.check_first_diagonal(orig_x,orig_y,
-                        count=count,reverse=reverse,x=x,y=x)
+                        count=count,reverse=reverse,x=x,y=y)
                 else:
-                    return count >= self.win_count
+                    if count >= self.win_count:
+                        return self.win_cells
+                    else:
+                        return False
         
     def check_diagonal(self,x,y):
         first = self.check_first_diagonal(x,y)
+        if isinstance(first,list):
+            return first
+        else:
+            self.win_cells = []
         second = self.check_second_diagonal(x,y)
-        if first:
-            print ('vertical first')
-        if second:
-            print ('vertical second')
-        return any([first,second])
+        if isinstance(second,list):
+            return second
+        else:
+            self.win_cells = []
+        return False
 
     def check_win_condition(self,data):
         x = data.get('x')
         y = data.get('y')
+        self.win_cells = []
         
-        win_array = [self.check_horizontal_axis(y,x),
-            self.check_vertical_axis(x,y),
-            self.check_diagonal(x,y)]
-        print(win_array)
-        if any(win_array):
-            return True
+        horizontal = self.check_horizontal_axis(y,x)
+        if isinstance(horizontal,list):
+            return horizontal
         else:
-            return False
+            self.win_cells = []
+        vertical = self.check_vertical_axis(x,y)
+        if isinstance(vertical,list):
+            return vertical
+        else:
+            self.win_cells = []
+        diagonal = self.check_diagonal(x,y)
+        if isinstance(diagonal,list):
+            return diagonal
+        else:
+            self.win_cells = []
+        return False
 
 class DataAdapter(object):
 
@@ -386,9 +429,8 @@ class WSHandler(WebSocketHandler):
         game.update_game_field_internal_owner(data)
         self.adapter.increment_moves(own_instance)
         win = game.check_win_condition(data)
-        if not win:
+        if not isinstance(win,list):
             leaderboard = self.adapter.get_leaderboard()
-            print('next move')
             opponent_instance['move'] = True
             own_instance['move'] = False
             opponent_instance.get('connection').write_message({
@@ -407,6 +449,7 @@ class WSHandler(WebSocketHandler):
                     }
                 })
         else:
+            win.append(data)
             self.adapter.increment_wins(own_instance)
             leaderboard = self.adapter.get_leaderboard()
             opponent_instance.get('connection').write_message({
@@ -414,14 +457,16 @@ class WSHandler(WebSocketHandler):
                     "content": {
                         "won": False,
                         "cell": data,
-                        "leaderboard":leaderboard
+                        "leaderboard":leaderboard,
+                        "winning_cells":win
                     }
                 })
             own_instance.get('connection').write_message({
                     "type":"game_over",
                     "content": {
                         "won": True,
-                        "leaderboard":leaderboard
+                        "leaderboard":leaderboard,
+                        "winning_cells":win
                     }
                 })
 
