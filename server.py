@@ -83,22 +83,21 @@ class Game(object):
         
             if isinstance(x,type(None)):
                 x = orig_x + 1
-                if x >= len(row):
-                    print('short row')
-                    reverse=True
+            else:
+                x += 1
+            if x >= len(row):
+                reverse=True
+                return self.check_horizontal_axis(y,orig_x,
+                    x=None,reverse=reverse,count=count)
+            else:
+                if row[x]['state'] == self.owner['mark']:
+                    count+=1
+                    return self.check_horizontal_axis(y,orig_x,
+                        x=x,reverse=reverse,count=count)
+                else:
+                    reverse = True
                     return self.check_horizontal_axis(y,orig_x,
                         x=None,reverse=reverse,count=count)
-                else:
-                    if row[x]['state'] == self.owner['mark']:
-                        print('incrementing count')
-                        count+=1
-                        return self.check_horizontal_axis(y,orig_x,
-                            x=x,reverse=reverse,count=count)
-                    else:
-                        print('wrong state')
-                        reverse = True
-                        return self.check_horizontal_axis(y,orig_x,
-                            x=None,reverse=reverse,count=count)
         else:
 
             if isinstance(x,type(None)):
@@ -116,24 +115,26 @@ class Game(object):
                     return count >= self.win_count
 
     def check_vertical_axis(self,x,orig_y,y=None,count=1,reverse=False):
-        print('checking vertical y: {0!s}, x:{1!s}, original_x:{2!s}, count: {3!s}, reverse: {4!s}'.format(y,x,orig_y,count,reverse))
+        print('checking vertical y: {0!s}, x:{1!s}, original_y:{2!s}, count: {3!s}, reverse: {4!s}'.format(y,x,orig_y,count,reverse))
         if not reverse:
         
-            if isinstance(x,type(None)):
+            if isinstance(y,type(None)):
                 y = orig_y + 1
-                if y >= len(row):
-                    reverse=True
-                    return self.check_horizontal_axis(x,orig_y,
-                        y=None,reverse=reverse,count=count)
+            else:
+                y += 1
+            if y >= len(self._game_field):
+                reverse=True
+                return self.check_vertical_axis(x,orig_y,
+                    y=None,reverse=reverse,count=count)
+            else:
+                if self._game_field[y][x]['state'] == self.owner['mark']:
+                    count+=1
+                    return self.check_vertical_axis(x,orig_y,
+                        y=y,reverse=reverse,count=count)
                 else:
-                    if self._game_field[y][x]['state'] == self.owner['mark']:
-                        count+=1
-                        return self.check_horizontal_axis(x,orig_y,
-                            y=y,reverse=reverse,count=count)
-                    else:
-                        reverse = True
-                        return self.check_horizontal_axis(x,orig_y,
-                            y=None,reverse=reverse,count=count)
+                    reverse = True
+                    return self.check_vertical_axis(x,orig_y,
+                        y=None,reverse=reverse,count=count)
         else:
 
             if isinstance(y,type(None)):
@@ -145,7 +146,7 @@ class Game(object):
             else:
                 if self._game_field[y][x]['state'] == self.owner['mark']:
                     count+=1
-                    return self.check_horizontal_axis(x,orig_y,
+                    return self.check_vertical_axis(x,orig_y,
                         y=y,reverse=reverse,count=count)
                 else:
                     return count >= self.win_count
